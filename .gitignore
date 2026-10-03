@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Dataset + generated artifacts (never commit Flickr8k)
+data/raw/flickr8k/*
+!data/raw/flickr8k/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Later phases
+models/
+outputs/
+data/features/
+data/captions/
+data/language_model/
+data/evaluation/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Phase 10 frontend
+node_modules/
+frontend/dist/
+
+# Environment / secrets
+.env
