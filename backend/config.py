@@ -11,14 +11,6 @@ deployment would lock origins to its own domain.
 from __future__ import annotations
 
 import os
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-# Load the project-root .env (OPENAI_API_KEY, OPENAI_VISION_MODEL, …).
-# The file is gitignored; .env.example documents the variables.
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(_PROJECT_ROOT / ".env")
 
 #: Upload constraints.
 MAX_UPLOAD_MB = 10
@@ -44,12 +36,6 @@ ALLOWED_ORIGINS: list[str] = [
     for origin in os.environ.get("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
     if origin.strip()
 ]
-
-#: Vision-language API (external, additional captioning method).
-#: The key lives in .env / the environment — never in the frontend.
-VISION_MODEL: str = os.environ.get("OPENAI_VISION_MODEL", "gpt-4o-mini")
-VISION_API_KEY: str | None = os.environ.get("OPENAI_API_KEY") or None
-VISION_TIMEOUT_SECONDS: float = float(os.environ.get("VISION_TIMEOUT_SECONDS", "30"))
 
 
 def validate_parameters(

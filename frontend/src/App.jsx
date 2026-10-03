@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { fetchConfig, generateCaption } from "./api.js";
 import ImageUploader from "./components/ImageUploader.jsx";
-import ClassicalCaption from "./components/ClassicalCaption.jsx";
-import VisionCaption from "./components/VisionCaption.jsx";
+import CaptionResult from "./components/CaptionResult.jsx";
 import RetrievedImages from "./components/RetrievedImages.jsx";
 import CandidateCaptions from "./components/CandidateCaptions.jsx";
 import ProcessingInfo from "./components/ProcessingInfo.jsx";
@@ -13,7 +12,6 @@ const FALLBACK_CONFIG = {
   supported_models: ["unigram", "bigram", "trigram"],
   allowed_top_k_range: [1, 10],
   max_upload_mb: 10,
-  vision_api: { configured: false, provider: "OpenAI", model: "" },
 };
 
 export default function App() {
@@ -34,14 +32,11 @@ export default function App() {
         setModel(config.default_model);
       })
       .catch(() => {
-        setError(
-          "Backend is not reachable. Start it with: python -m uvicorn backend.main:app --reload"
-        );
+        setError("Backend is not reachable. Start it with: python -m uvicorn backend.main:app --reload");
       });
   }, []);
 
   const canGenerate = file && !loading;
-  const vision = result ? result.vision_api : config.vision_api;
 
   async function handleGenerate() {
     if (!canGenerate) return;
@@ -67,21 +62,14 @@ export default function App() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1>Classical ML + Vision-Language API Image Captioning</h1>
+        <h1>Classical ML Image Caption Generator</h1>
         <p className="subtitle">
-          Two independent captioning methods for one image: the classical
-          pipeline (HOG + colour histogram + LBP → PCA → retrieval → trigram
-          LM) and an external vision-language API — clearly labelled, side by
-          side.
-        </p>
-        <p className={`vision-status ${vision?.configured ? "connected" : "disconnected"}`}>
-          Vision API: {vision?.configured ? "Connected" : "Not configured"}
-          {vision?.model ? ` (${vision.provider} · ${vision.model})` : ""}
+          Classical computer vision + statistical NLP — no LLMs, no neural networks.
         </p>
       </header>
 
       <section className="card">
-        <h2>Image Caption Generator</h2>
+        <h2>Upload an image</h2>
         <ImageUploader file={file} onFileSelected={setFile} config={config} />
         <div className="controls">
           <label>
@@ -95,7 +83,7 @@ export default function App() {
             </select>
           </label>
           <label>
-            Classical language model
+            Language model
             <select value={model} onChange={(event) => setModel(event.target.value)}>
               {config.supported_models.map((name) => (
                 <option key={name} value={name}>
@@ -116,59 +104,38 @@ export default function App() {
           </label>
         </div>
         <button className="generate" onClick={handleGenerate} disabled={!canGenerate}>
-          {loading ? "Analyzing image..." : "Generate Caption"}
+          {loading ? "Generating caption..." : "Generate Caption"}
         </button>
-        {loading && (
-          <p className="loading">
-            Analyzing image — running the classical pipeline and querying the
-            vision API…
-          </p>
-        )}
+        {loading && <p className="loading">Extracting visual features, retrieving training images, decoding…</p>}
         {error && <p className="error">{error}</p>}
       </section>
 
       {result && (
         <>
-          <section className="comparison-grid">
-            <ClassicalCaption classical={result.classical} />
-            <VisionCaption vision={result.vision_api} />
-          </section>
-          <RetrievedImages retrieved={result.classical.retrieved_images} />
+          <CaptionResult caption={result.generated_caption} />
+          <RetrievedImages retrieved={result.retrieved_images} />
           <CandidateCaptions
-            captionCount={result.classical.candidate_caption_count}
-            wordCount={result.classical.candidate_word_count}
-            sample={result.classical.candidate_captions_sample}
+            captionCount={result.candidate_caption_count}
+            wordCount={result.candidate_word_count}
+            sample={result.candidate_captions_sample}
           />
-          <ProcessingInfo
-            processing={result.classical.processing}
-            languageModel={result.classical.model_label}
-            topK={result.classical.top_k}
-          />
+          <ProcessingInfo processing={result.processing} languageModel={result.language_model} topK={result.top_k} />
         </>
       )}
 
       <section className="card methodology">
         <h2>Methodology</h2>
         <ol>
-          <li>
-            <strong>Classical pipeline:</strong> HOG + HSV colour histogram +
-            LBP → per-family standardization → fusion → PCA (training-fitted)
-            → cosine retrieval over 6,000 training images → their training
-            captions → trigram n-gram language model (greedy decoding).
-          </li>
-          <li>
-            <strong>Vision-language API:</strong> the same uploaded image is
-            sent from this page → FastAPI backend → OpenAI vision API → its
-            caption is returned verbatim.
-          </li>
+          <li>HOG + HSV colour histogram + LBP (classical handcrafted features)</li>
+          <li>Per-family standardization, feature fusion, PCA (fitted on training data only)</li>
+          <li>Cosine-similarity retrieval over 6,000 training images</li>
+          <li>Captions of the retrieved training images as candidate pool</li>
+          <li>Trigram n-gram language model with Laplace smoothing (greedy decoding)</li>
         </ol>
         <p className="note">
-          The classical descriptors measure colour, texture and edge
-          statistics — they do not recognise objects, so the classical caption
-          can be generic or wrong. The vision-language API is an external
-          hosted model: it is <em>not</em> part of the classical ML baseline
-          and was not trained by this project. Both outputs are shown exactly
-          as produced.
+          The visual descriptors measure colour, texture and edge statistics — they do not
+          recognise objects. Captions are generated from <em>visually similar</em> training
+          images and may therefore be generic or imperfect.
         </p>
       </section>
     </div>

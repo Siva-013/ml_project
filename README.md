@@ -1,49 +1,25 @@
-# Classical ML and Vision-Language API Based Image Captioning System
+# Classical Image Caption Generation Using Visual Feature Retrieval and Statistical NLP
 
-**Two clearly-labelled captioning methods for one uploaded image, side by
-side in one web application.**
+**Classical ML / Statistical NLP — No LLM.**
 
-**Classical Pipeline** — the project's own fully local, explainable
-baseline (Phases 1–9), built **entirely** from classical techniques
-(hand-crafted visual features, PCA, retrieval, n-gram language models).
-Its core algorithms contain no LLMs, Transformers, pretrained CNNs or
-external AI APIs.
+An academic image captioning system built **entirely** from classical
+techniques: hand-crafted visual features (HOG, color histograms, LBP),
+classical machine learning (PCA, KNN retrieval, K-Means analysis) and
+statistical NLP (n-gram language models with smoothing). The project
+deliberately contains **no** LLMs, Transformers, pretrained CNNs,
+pretrained embeddings or external AI APIs of any kind.
 
-```text
-Classical Pipeline
-HOG + HSV Color Histogram + LBP
-        ↓
-Feature Fusion + PCA (fitted on training data only)
-        ↓
-Cosine Similarity Retrieval (6,000-image training gallery)
-        ↓
-N-gram Language Model (trigram, Laplace smoothing)
-        ↓
-Classical Caption
+```
+IMAGE → preprocessing → HOG + Color + LBP → fusion → PCA → KNN retrieval
+      → captions of visually similar training images → n-gram scoring
+      → ranked caption → BLEU / ROUGE / METEOR evaluation
 ```
 
-**Vision API Pipeline** — an external hosted model (OpenAI Responses API),
-added in Phase 10 as a comparison method. It is **not** part of the
-classical ML baseline and was **not** trained by this project.
-
-```text
-Vision API Pipeline
-Uploaded Image
-        ↓
-FastAPI backend (API key stays server-side)
-        ↓
-Vision-Language API
-        ↓
-Natural Language Caption
-```
-
-Both captions are returned together by `/api/caption` and displayed side
-by side, exactly as produced — no editing, no scoring, no declared winner.
-The classical branch performs *visual similarity*, not semantic
-understanding; measured on the test set (Phase 9): BLEU-1 0.488 · BLEU-4
-0.090 · ROUGE-L 0.343. The vision-API caption typically describes the
-actual objects and setting — the comparison makes the gap concrete and
-visible.
+The visual pipeline performs *visual similarity*, not semantic
+understanding; the caption pipeline is statistical NLP over the captions of
+retrieved neighbors. This distinction is maintained throughout the code and
+documentation. Since Phase 6 the project has two independent branches —
+images (Phase 2 → 3 → 4 → 5) and captions (Phase 6) — joined in Phase 8.
 
 ## Project status
 
@@ -78,6 +54,8 @@ Per-phase documentation lives in [`docs/`](docs/):
 - pandas, Pillow, PyYAML, pytest (Phase 1)
 - NumPy, scikit-image, tqdm (Phases 2–3)
 - matplotlib (Phase 3 diagnostic visualization only)
+- scikit-learn, joblib (Phase 4)
+- FastAPI, uvicorn, python-multipart, httpx (Phase 10 web application)
 
 ## Setup
 
@@ -168,45 +146,14 @@ python -m src.caption_generation.run --image 1000268201_693b08cb0e.jpg --top-k 1
 python -m src.evaluation.run --split validation --all-models
 python -m src.evaluation.run --split test
 
-## Running the Application
-
-### Vision API setup (one-time, optional but recommended)
-
-Copy `.env.example` to `.env` and add your key — it stays on the backend
-and is never exposed to the frontend:
-
-```powershell
-Copy-Item .env.example .env
-# then edit .env:  OPENAI_API_KEY=sk-...
-```
-
-Without a key the app runs fully — the UI shows
-"Vision API: Not configured" and the classical caption alone.
-
-### Backend
-
-```powershell
-.venv\Scripts\Activate.ps1
-python -m uvicorn backend.main:app --reload
-```
-
-API + Swagger UI: <http://127.0.0.1:8000/docs>
-
-### Frontend (second terminal)
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open <http://localhost:5173> (the Vite dev server proxies `/api` to the
-backend on port 8000).
-
 # Phase 3/4/5 — diagnostic visualizations (no deep learning)
 python -m src.features.visualize 1000268201_693b08cb0e.jpg
 python -m src.features.visualize_pca
 python -m src.retrieval.visualize --image 1000268201_693b08cb0e.jpg --top-k 5
+
+# Phase 10 — web application (second terminal each)
+python -m uvicorn backend.main:app --reload        # backend, http://127.0.0.1:8000/docs
+cd frontend && npm install && npm run dev          # frontend, http://localhost:5173
 
 # Run the test suite (237 tests; dataset-dependent tests skip when absent)
 pytest
@@ -224,6 +171,9 @@ Outputs:
   metadata (Phase 4)
 - `data/captions/` — processed caption CSVs, `vocabulary.json`,
   `encoded_captions.json`, `caption_metadata.json` (Phase 6)
+- `data/language_model/` — `ngram_model.json`, `model_metadata.json` (Phase 7)
+- `data/evaluation/` — predictions, metrics, comparisons, qualitative
+  analysis (Phase 9)
 - `outputs/visualizations/` — diagnostic figures (Phases 3–5)
 
 Feature configuration (all values also recorded in `feature_metadata.json`):
@@ -248,7 +198,7 @@ ml_image_caption_generation/
 ├── README.md, requirements.txt, .gitignore, LICENSE, pytest.ini
 ├── configs/config.yaml          # paths, exclusions, knobs
 ├── data/raw/flickr8k/           # dataset goes here (not committed)
-├── data/processed/              # Phase 1 CSVs + reports
+├── data/processed/              # Phase 1 CSVs + reports (not committed)
 ├── data/features/               # Phase 3 matrices + Phase 4 fusion/ (not committed)
 ├── data/captions/               # Phase 6 processed captions + vocabulary (not committed)
 ├── data/language_model/         # Phase 7 n-gram model + metadata (not committed)
@@ -289,7 +239,8 @@ caption branch → evaluation → web application.
   tests on the saved artifacts); validation, test and the 91 unassigned
   images are only ever transformed, and unassigned rows are stored
   separately.
-- Feature rows carry their split label (`splits.npy`), so Phase 5 will fit
-  the retrieval index and K-Means on **training** data only.
-- Validation data will be used for hyperparameter selection only; test
-  data only once, for final evaluation.
+- Phase 7 fits the n-gram model on the 30,000 training captions only;
+  validation is used for perplexity, test is reserved for Phase 9.
+- Phase 8 candidate captions come only from training images (verified).
+- Phase 9 uses validation for all experiments and evaluates the test set
+  exactly once, after configuration choices are fixed.
